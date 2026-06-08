@@ -1,4 +1,4 @@
-import Mathlib
+--import Mathlib
 import Blaster
 
 abbrev Addr := String
@@ -39,11 +39,11 @@ lemma addAccount_preserves_noneg (ledger : Ledger) (acc : Account) :
 def getBalance (ledger : Ledger) (name : Addr) : Option Amount := do
   let acc <- ledger.find? (λ x => x.addr == name)
   return acc.bal
- 
+
 def getSupply (ledger : Ledger) : Amount := (ledger.map (λ x => x.bal)).sum
 
 def debitAccount (ledger : Ledger) (addr : Addr) (amt : Amount) : Option Ledger :=
-  match ledger with    
+  match ledger with
   | [] => none
   | h :: t =>
       if (h.addr == addr) then
@@ -98,7 +98,7 @@ lemma debitAccount_preserves_noneg (ledger : Ledger) (addr : Addr) (amt : Amount
         subst hdebit
         simp [noneg]
         exact ⟨hnonegx, xih ys hnonegxs hdebit'⟩
-    
+
 def creditAccount (ledger : Ledger) (addr : Addr) (amt : Amount) : Option Ledger :=
   match ledger with
   | []     => none
@@ -138,8 +138,8 @@ theorem transferFunds_preserves_supply (ledger : Ledger) (fromAddr toAddr : Addr
         ring
 
 lemma transferFunds_preserves_noneg (ledger : Ledger) (fromAddr toAddr : Addr) (amt : Amount) :
-  ∀ ledger', ledger.noneg 
-  -> ledger.transferFunds fromAddr toAddr amt = some ledger' 
+  ∀ ledger', ledger.noneg
+  -> ledger.transferFunds fromAddr toAddr amt = some ledger'
   -> ledger'.noneg := by sorry
 
 structure Proposal where
@@ -183,7 +183,7 @@ def propose (dao : DAO) (proposer : Addr) (amt : Amount) : Option DAO :=
 def vote (dao : DAO) (pid : Nat) (vt : Vote) : Option DAO :=
   let propl' := dao.propl.map (λ p =>
     if p.id != pid
-    then p 
+    then p
     else if p.done
     then p
     else
@@ -193,7 +193,7 @@ def vote (dao : DAO) (pid : Nat) (vt : Vote) : Option DAO :=
   return { dao with propl := propl' }
 
 def execute (dao : DAO) (pid : Nat) : Option DAO := do
-  let p <- dao.propl.find? (λ q => q.id == pid) 
+  let p <- dao.propl.find? (λ q => q.id == pid)
   if p.done
   then none
   else if p.yes <= p.no
@@ -232,7 +232,7 @@ lemma propose_preserves_ledger (dao : DAO) (proposer : Addr) (amt : Amount) :
   simp [contract, propose] at hStep
   subst hStep
   rfl
- 
+
 lemma vote_preserves_ledger (dao : DAO) (pid : Nat) (vote : Vote) :
   ∀ dao', dao.contract (.vote pid vote) = some dao'
   -> dao'.ledger = dao.ledger := by sorry

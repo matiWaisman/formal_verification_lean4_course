@@ -1,3 +1,6 @@
 /.lake
 /.direnv
 **/personal
+
+# Aiken build artifacts
+**/build/

@@ -41,11 +41,13 @@ def donate (donor : Account) (campaign : Campaign) (currentTime : Time) (amt : A
     none
   else
     let backer : Account := { donor with bal := amt }
+    let newTotalRaised := campaign.totalRaised + amt
     some {
       campaign := {
         campaign with
         backers := campaign.backers ++ [backer],
-        totalRaised := campaign.totalRaised + amt
+        totalRaised := newTotalRaised,
+        funded := if newTotalRaised >= campaign.goal then true else false
       },
       actor := { donor with bal := donor.bal - amt }
     }
@@ -112,10 +114,19 @@ def claim (claimer : Account) (campaign : Campaign) (currentTime : Time) : Optio
 
 -- Si currentBlock < maxBlock ∧ totalRaised > 0 → la longitud de backers es mayor a cero / Si se pudo hacer donate entonces la longitud de backers es mayor a cero
 
+-- Si donate devuelve some, entonces result.campaign.funded = true ↔ campaign.totalRaised + amt >= campaign.goal
 
+-- Si claim devuelve some, entonces el claimer ya no aparece en result.campaign.backers
 
+-- Si claim devuelve some, entonces no cambia campaign.totalRaised
 
-theorem donate_preserves_backersCount_invariant
+-- Si claim devuelve some, entonces la longitud de backers baja en 1
+
+-- Si una cuenta no esta en backers, entonces claim devuelve none
+
+-- donate preserva que no haya direcciones duplicadas en backers
+
+theorem donate_increases_backers_length
     (donor : Account)
     (campaign : Campaign)
     (currentTime : Time)
@@ -124,19 +135,58 @@ theorem donate_preserves_backersCount_invariant
     -> result.campaign.backers.length = campaign.backers.length + 1 := by
   intro inv res
   unfold donate at res
-  split at res
-  · contradiction
-  . split at res
-    . contradiction
-    . split at res
-      . contradiction
-      . split at res
-        . contradiction
-        . split at res
-          . contradiction
-          . cases res
-            simp [List.length_append]
+  repeat
+    split at res
+    · contradiction
+  cases res
+  simp [List.length_append]
 
+
+theorem donate_preserves_no_duplicates
+  (donor : Account)
+  (campaign : Campaign)
+  (currentTime : Time)
+  (amt : Amount)
+  (hNoDuplicates : ∀ backer, backer ∈ campaign.backers ->
+    (campaign.backers.map Account.addr).count backer.addr = 1) :
+  ∀ result, donate donor campaign currentTime amt = some result ->
+    ∀ backer, backer ∈ result.campaign.backers ->
+      (result.campaign.backers.map Account.addr).count backer.addr = 1 := by
+        intro res d account hAccInBackers
+        unfold donate at d
+        split at d
+        · contradiction
+        rename_i hDonorNotInBackers
+        repeat
+          split at d
+          · contradiction
+        cases d
+
+        have hDonorAddrCountZero :
+            (campaign.backers.map Account.addr).count donor.addr = 0 := by
+          rw [List.count_eq_zero]
+          intro hMem
+          apply hDonorNotInBackers
+          simp at hMem
+          rw [List.any_eq_true]
+          rcases hMem with ⟨a, ha, hAddr⟩
+          apply Exists.intro a
+          constructor
+          · exact ha
+          · simp [hAddr]
+
+        simp at hAccInBackers
+        rcases hAccInBackers with hOld | hNew
+        · have hAccountAddrNeDonor : account.addr ≠ donor.addr := by
+            intro hEq
+            have : donor.addr ∈ campaign.backers.map Account.addr := by
+              rw [← hEq]
+              exact List.mem_map_of_mem hOld
+            rw [List.count_eq_zero] at hDonorAddrCountZero
+            exact hDonorAddrCountZero this
+          simp [hNoDuplicates account hOld, Ne.symm hAccountAddrNeDonor]
+        · subst hNew
+          simp [hDonorAddrCountZero]
 
 /-
 theorem claim_preserves_backersCount_invariant

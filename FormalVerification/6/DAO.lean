@@ -1,4 +1,6 @@
---import Mathlib
+import Mathlib.Data.List.Basic
+import Mathlib.Tactic.Ring
+import Mathlib.Tactic.SplitIfs
 import Blaster
 
 abbrev Addr := String

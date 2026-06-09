@@ -136,9 +136,9 @@ theorem getFunds_requires_owner
       repeat
         split at hStep
         . contradiction
-      rename_i periodEnded claimerIsOwner reachedGoal
+      rename_i claimerIsOwner periodEnded reachedGoal
       simp at claimerIsOwner
-      blaster 
+      exact claimerIsOwner
 
 -- Very similar but for claim (using Blaster for the whole proof)
 theorem claim_requires_backer
@@ -218,6 +218,19 @@ theorem getFunds_sets_nonnegative_totalRaised
     cases hGetFunds
     simp
 
+-- If donate returns some, then the resulting backers list is not empty.
+theorem donate_success_implies_nonempty_backers
+    (donor : Account)
+    (campaign : Campaign)
+    (currentTime : Time)
+    (amt : Amount) :
+    ∀ result, donate donor campaign currentTime amt = some result ->
+      result.campaign.backers.length > 0 := by
+  intro result hDonate
+  have hLength :=
+    donate_increases_backers_length donor campaign currentTime amt result hDonate
+  clear hDonate donor currentTime amt
+  omega
 
 -- If every backer has a positive balance and claim returns some, totalRaised decreases.
 theorem claim_decreases_totalRaised
@@ -244,16 +257,6 @@ theorem claim_decreases_totalRaised
 
     sorry
 
--- If a donation succeeds, a second donation from the same account fails.
-theorem cannot_donate_twice
-    (donor : Account)
-    (campaign : Campaign)
-    (currentTime : Time)
-    (amt : Amount) :
-    ∀ result, donate donor campaign currentTime amt = some result ->
-      donate donor result.campaign currentTime amt = none := by
-  sorry
-
 -- If totalRaised was nonnegative and donate returns some, the new totalRaised remains nonnegative.
 theorem donate_preserves_nonnegative_totalRaised
     (donor : Account)
@@ -276,19 +279,6 @@ theorem claim_preserves_nonnegative_totalRaised
       result.campaign.totalRaised >= 0 := by
   sorry
 
--- If donate returns some, then the resulting backers list is not empty.
-theorem donate_success_implies_nonempty_backers
-    (donor : Account)
-    (campaign : Campaign)
-    (currentTime : Time)
-    (amt : Amount) :
-    ∀ result, donate donor campaign currentTime amt = some result ->
-      result.campaign.backers.length > 0 := by
-  intro result hDonate
-  have hLength :=
-    donate_increases_backers_length donor campaign currentTime amt result hDonate
-  clear hDonate donor currentTime amt
-  omega
 
 -- If there were no duplicate addresses before claim, there are none afterward.
 theorem claim_preserves_no_duplicates

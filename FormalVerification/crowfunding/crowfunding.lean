@@ -58,7 +58,7 @@ def getFunds (claimer : Account) (campaign : Campaign) (currentTime : Time) : Op
     none
   else if claimer.addr != campaign.owner.addr then
     none
-  else if campaign.totalRaised <= campaign.goal then
+  else if campaign.totalRaised < campaign.goal then
     none
   else if campaign.funded then
     none
@@ -86,12 +86,14 @@ def claim (claimer : Account) (campaign : Campaign) (currentTime : Time) : Optio
       campaign := {
         campaign with
         backers := campaign.backers.filter (fun b => b.addr != claimer.addr)
+        totalRaised := campaign.totalRaised - amtDonatedByClaimer
       },
       actor := { claimer with bal := claimer.bal + amtDonatedByClaimer }
     }
 
--- Si claim devolvio some, entonces el currentBlock es mayor a max block y se cumplen el resto de las condiciones
-/-
+-- Teorems --
+
+--If claim returned some, then every condition is met
   theorem canClaimIfConditionsAreMet
   (claimer : Account)
   (campaign : Campaign)
@@ -104,27 +106,11 @@ def claim (claimer : Account) (campaign : Campaign) (currentTime : Time) : Optio
   campaign.backers.any (fun b => b.addr == claimer.addr) := by
   intro res result
   unfold claim at result
-
--/
-
-
--- No se puede donar dos veces donate con persona es exitoso -> donate con la siguiente falla
-
--- totalRaised siempre es mayor o igual a cero (se podria probar para las tres)
-
--- Si currentBlock < maxBlock ∧ totalRaised > 0 → la longitud de backers es mayor a cero / Si se pudo hacer donate entonces la longitud de backers es mayor a cero
-
--- Si donate devuelve some, entonces result.campaign.funded = true ↔ campaign.totalRaised + amt >= campaign.goal
-
--- Si claim devuelve some, entonces el claimer ya no aparece en result.campaign.backers
-
--- Si claim devuelve some, entonces no cambia campaign.totalRaised
-
--- Si claim devuelve some, entonces la longitud de backers baja en 1
-
--- Si una cuenta no esta en backers, entonces claim devuelve none
-
--- donate preserva que no haya direcciones duplicadas en backers
+  repeat
+    split at result
+    · contradiction
+  -- Because we added every negation of the if condition to the hypotesis, we now have every condition in goal under the hypotesis
+  simp_all -- Simplifies using every hypotesis
 
 theorem donate_increases_backers_length
     (donor : Account)
@@ -140,6 +126,24 @@ theorem donate_increases_backers_length
     · contradiction
   cases res
   simp [List.length_append]
+
+-- No se puede donar dos veces donate con persona es exitoso -> donate con la siguiente falla
+
+-- totalRaised siempre es mayor o igual a cero (se podria probar para las tres)
+
+-- Si currentBlock < maxBlock ∧ totalRaised > 0 → la longitud de backers es mayor a cero / Si se pudo hacer donate entonces la longitud de backers es mayor a cero
+
+-- Si donate devuelve some, entonces result.campaign.funded = true ↔ campaign.totalRaised + amt >= campaign.goal
+
+-- Si claim devuelve some, entonces el claimer ya no aparece en result.campaign.backers
+
+-- Si claim devuelve some, entonces totalRaised baja en la cantidad igual que lo que dono
+
+-- Si claim devuelve some, entonces la longitud de backers baja en 1
+
+-- Si una cuenta no esta en backers, entonces claim devuelve none
+
+-- donate preserva que no haya direcciones duplicadas en backers
 
 
 theorem donate_preserves_no_duplicates
@@ -160,46 +164,36 @@ theorem donate_preserves_no_duplicates
         repeat
           split at d
           · contradiction
-        cases d
+        cases d -- Replaces res in goal with d
 
-        have hDonorAddrCountZero :
+        have hDonorAddrCountZero : -- Donor isnt in backers before
             (campaign.backers.map Account.addr).count donor.addr = 0 := by
           rw [List.count_eq_zero]
           intro hMem
           apply hDonorNotInBackers
           simp at hMem
           rw [List.any_eq_true]
-          rcases hMem with ⟨a, ha, hAddr⟩
+          rcases hMem with ⟨a, ha, hAddr⟩ -- Decomposes the hMem hypotesis intro three
           apply Exists.intro a
           constructor
           · exact ha
           · simp [hAddr]
 
         simp at hAccInBackers
-        rcases hAccInBackers with hOld | hNew
-        · have hAccountAddrNeDonor : account.addr ≠ donor.addr := by
-            intro hEq
+        rcases hAccInBackers with hOld | hNew -- Decomposes the hAccInBackers in two cases
+        -- In this case we have to prove that, assuming account was already a backer,
+        -- adding the donor preserves the count of account.addr at exactly one.
+        · have hAccountAddrNeDonor : account.addr ≠ donor.addr := by -- Donor account is different than account
+            intro hEq -- Assume that is false to come to a contradiction
             have : donor.addr ∈ campaign.backers.map Account.addr := by
               rw [← hEq]
-              exact List.mem_map_of_mem hOld
+              exact List.mem_map_of_mem hOld -- If account is in backers, account.addr is in the transformed list backers.map Account.addr
             rw [List.count_eq_zero] at hDonorAddrCountZero
-            exact hDonorAddrCountZero this
+            exact hDonorAddrCountZero this -- Contradiction
+          -- The old count is one by hNoDuplicates; the symmetric inequality lets simp prove
+          -- that appending the donor does not add another occurrence of account.addr.
           simp [hNoDuplicates account hOld, Ne.symm hAccountAddrNeDonor]
-        · subst hNew
-          simp [hDonorAddrCountZero]
-
-/-
-theorem claim_preserves_backersCount_invariant
-    (claimer : Account)
-    (campaign : Campaign)
-    (currentTime : Time) :
-    campaign.backersCount = campaign.backers.length
-    -> backersNoDuplicateAddresses campaign.backers
-    -> ∀ result, claim claimer campaign currentTime = some result
-    -> result.campaign.backersCount = result.campaign.backers.length := by
-  intro inv nodup result res
-  unfold claim at res
-  repeat
-    split at res
-    · contradiction
--/
+        -- In this case we have to prove that, assuming account is the new donor,
+        -- donor.addr appears exactly once after being added to the backers.
+        · subst hNew -- Replaces account with the new donor backer, reducing account.addr to donor.addr
+          simp [hDonorAddrCountZero] -- Uses that donor.addr previously appeared zero times to prove it now appears exactly once
